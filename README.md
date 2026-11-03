@@ -1,6 +1,6 @@
 # fastgeodesic
 
-Drop-in Rust replacement for [geographiclib](https://pypi.org/project/geographiclib/) and the distance functions of [geopy](https://pypi.org/project/geopy/). Same API, same results, 32–54x faster.
+Drop-in Rust replacement for [geographiclib](https://pypi.org/project/geographiclib/) and the distance functions of [geopy](https://pypi.org/project/geopy/). Same API, same results, 32–53x faster.
 
 Replace `geopy` (or `geographiclib`) with `fastgeodesic` in the import. Nothing else changes.
 
@@ -27,9 +27,9 @@ Apple M1 Pro, Python 3.12, median of repeated runs.
 |---|---|---|---|
 | `Geodesic.WGS84.Inverse`, 50,000 random pairs | 2,107 ms | 65 ms | 32x |
 | `fastgeodesic.inverse_many`, same pairs | 2,107 ms | 33 ms | 64x |
-| `geopy.distance.geodesic`, 20,000 random pairs | 1,208 ms | 23 ms | 54x |
-| Total length of a 100,000-point GPS log with `geopy.distance.geodesic` | 3,652 ms | 80 ms | 46x |
-| Same GPS log with `numpy.float64` coordinates (pandas rows) | 3,660 ms | 85 ms | 43x |
+| `geopy.distance.geodesic`, 20,000 random pairs | 1,195 ms | 23 ms | 53x |
+| Total length of a 100,000-point GPS log with `geopy.distance.geodesic` | 3,597 ms | 82 ms | 44x |
+| Same GPS log with `numpy.float64` coordinates (pandas rows) | 3,568 ms | 90 ms | 40x |
 
 Short distances such as consecutive GPS points converge quickly even in pure Python, so the speedup there is smaller than for random pairs.
 
@@ -81,7 +81,7 @@ fastgeodesic.patch()    # replaces Geodesic in geographiclib.geodesic and geopy.
 fastgeodesic.unpatch()  # restores the originals
 ```
 
-It replaces exactly one name, `Geodesic`, in those two modules. Call it before other modules copy the name with `from geographiclib.geodesic import Geodesic`. The speedup is smaller than changing the import (9x instead of 46x on GPS logs) because geopy's own Python code still runs.
+It replaces exactly one name, `Geodesic`, in those two modules. Call it before other modules copy the name with `from geographiclib.geodesic import Geodesic`. The speedup is smaller than changing the import (9x instead of 44x on GPS logs) because geopy's own Python code still runs.
 
 ## Supported API
 
@@ -105,7 +105,7 @@ It replaces exactly one name, `Geodesic`, in those two modules. Call it before o
 pip install fastgeodesic
 ```
 
-Prebuilt wheels for Linux, macOS and Windows on x86_64 and ARM, Python 3.9 and later. `fastgeodesic.distance` needs geopy 2.x, which you already have if you are replacing geopy imports; `pip install "fastgeodesic[geopy]"` installs it too.
+Prebuilt wheels for Linux, macOS and Windows on x86_64 and ARM, Python 3.9 and later. `fastgeodesic.distance` needs geopy 2.x, which you already have if you are replacing geopy imports; `pip install "fastgeodesic[geopy]"` installs it too. It is tested with geopy 2.0 to 2.5. On other geopy versions distances are still computed with fastgeodesic, but object construction falls back to geopy's own code, so it is slower.
 
 To build from source you need a Rust toolchain:
 

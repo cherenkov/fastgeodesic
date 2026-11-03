@@ -1,9 +1,14 @@
 """fastgeodesic.distance must behave exactly like geopy.distance."""
 
+import copy
+import importlib
+import pickle
 import random
+from unittest import mock
 
 import pytest
 from geopy import distance as ref
+from geopy import units
 from geopy.point import Point
 
 from fastgeodesic import distance as fast
@@ -115,9 +120,6 @@ def test_geopy_untouched():
 
 
 def test_pickle_and_copy():
-    import copy
-    import pickle
-
     f = fast.geodesic((35.0, 139.0), (36.0, 140.0), ellipsoid="GRS-80")
     for g in (pickle.loads(pickle.dumps(f)), copy.deepcopy(f), copy.copy(f)):
         assert g.km == f.km and g.ELLIPSOID == f.ELLIPSOID
@@ -153,8 +155,6 @@ def test_star_import_and_dir():
 
 
 def test_core_geodesic_pickle():
-    import pickle
-
     from fastgeodesic import Geodesic
 
     g = pickle.loads(pickle.dumps(Geodesic(6377397.155, 1 / 299.1528128)))
@@ -169,16 +169,15 @@ def test_fast_init_matches_geopy_attributes():
         assert (f.ellipsoid_key, f.ELLIPSOID) == (r.ellipsoid_key, r.ELLIPSOID)
         assert (f.geod.a, f.geod.f) == (r.geod.a, r.geod.f)
         assert same_km(f.km, r.km)
-        assert f.meters == (f.km + 0.0) * 1000 and f.m == f.meters
+        assert f.m == f.meters
         assert f.meters == pytest.approx(r.meters, rel=1e-12, abs=1e-8)
 
 
 def test_meters_formula_matches_geopy_units():
-    from geopy import units
-
     for km in [0.0, -0.0, 1e-9, 1.5, 12345.678, -3.0]:
-        assert fast.geodesic(km).meters == units.meters(kilometers=km)
-        assert str(fast.geodesic(km).meters) == str(ref.geodesic(km).meters)
+        m = fast.geodesic(km).meters
+        assert m == units.meters(kilometers=km)
+        assert str(m) == str(ref.geodesic(km).meters)
 
 
 def test_subclass_uses_its_own_measure():
@@ -187,3 +186,52 @@ def test_subclass_uses_its_own_measure():
             return 42.0
 
     assert Mine((35.0, 139.0), (36.0, 140.0)).km == 42.0
+
+
+def test_ellipsoids_replaced_at_runtime():
+    other = (6377.397155, 6356.078963, 1 / 299.1528128)
+    a, b = (1.0, 2.0), (3.0, 4.0)
+    with mock.patch.dict(ref.ELLIPSOIDS, {"WGS-84": other}):
+        expected = ref.geodesic(a, b).km
+        assert same_km(fast.geodesic(a, b).km, expected)
+        assert same_km(fast.geodesic((1, 2), (3, 4)).km, expected)
+
+
+def test_mocked_methods_are_used():
+    with mock.patch.object(fast.geodesic, "measure", return_value=1.0):
+        assert fast.geodesic((1.0, 2.0), (3.0, 4.0)).km == 1.0
+    calls = []
+
+    def spy(self, ellipsoid):
+        calls.append(ellipsoid)
+        ref.geodesic.set_ellipsoid(self, ellipsoid)
+
+    with mock.patch.object(fast.geodesic, "set_ellipsoid", spy):
+        fast.geodesic((1.0, 2.0), (3.0, 4.0))
+    assert calls == ["WGS-84"]
+
+
+def test_meters_follows_overridden_kilometers():
+    class Corrected(fast.geodesic):
+        @property
+        def kilometers(self):
+            return 2.0
+
+    assert Corrected((1.0, 2.0), (3.0, 4.0)).meters == 2000.0
+
+
+def test_unknown_geopy_version_falls_back_to_geopy_init():
+    import geopy
+
+    import fastgeodesic.distance as mod
+
+    try:
+        with mock.patch.object(geopy, "__version__", "2.6.0"):
+            importlib.reload(mod)
+            assert "__init__" not in vars(mod.geodesic) and "meters" not in vars(mod.geodesic)
+            a, b = (35.36, 138.72), (35.68, 139.76)
+            assert same_km(mod.geodesic(a, b).km, ref.geodesic(a, b).km)
+            assert mod.geodesic(a, b).meters == ref.geodesic(a, b).meters
+    finally:
+        importlib.reload(mod)
+    assert "__init__" in vars(mod.geodesic)

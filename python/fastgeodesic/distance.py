@@ -13,8 +13,10 @@ object. geopy itself is not modified.
 
 import functools
 
+import geopy
 from geographiclib.geodesic import Geodesic as _RefGeodesic
 from geopy import distance as _geopy_distance
+from geopy import units as _units
 from geopy.distance import *  # noqa: F401,F403  (geopy.distance has no __all__: every public name)
 from geopy.point import Point
 
@@ -27,7 +29,8 @@ def _geods(a, f):
     return _FastGeodesic(a, f), _RefGeodesic(a, f)
 
 
-_WGS84 = _geopy_distance.ELLIPSOIDS["WGS-84"]
+_ELLIPSOIDS = _geopy_distance.ELLIPSOIDS
+_WGS84 = _ELLIPSOIDS["WGS-84"]
 _WGS84_FAST, _WGS84_REF = _geods(_WGS84[0], _WGS84[2])
 
 
@@ -50,9 +53,48 @@ def _plain(p):
         and isinstance(lon, (float, int))
         and not isinstance(lat, bool)
         and not isinstance(lon, bool)
-        and -90 <= lat <= 90
-        and -180 <= lon <= 180
+        and -90.0 <= lat <= 90.0
+        and -180.0 <= lon <= 180.0
     )
+
+
+def _measure(self, a, b):
+    e = self.ELLIPSOID
+    if e is _WGS84:
+        fast, self.geod = _WGS84_FAST, _WGS84_REF
+    else:
+        fast, self.geod = _geods(e[0], e[2])
+    # Most common input first: two (lat, lon) tuples of floats (numpy.float64 is a float subclass)
+    if type(a) is tuple and type(b) is tuple and len(a) == 2 and len(b) == 2:
+        lat1, lon1 = a
+        lat2, lon2 = b
+        if (
+            isinstance(lat1, float) and isinstance(lon1, float) and isinstance(lat2, float) and isinstance(lon2, float)
+            # float bounds: comparing float with int is slower in CPython
+            and -90.0 <= lat1 <= 90.0 and -90.0 <= lat2 <= 90.0 and -180.0 <= lon1 <= 180.0 and -180.0 <= lon2 <= 180.0
+        ):
+            return fast._s12(lat1, lon1, lat2, lon2)
+    if _plain(a) and _plain(b):
+        return fast._s12(a[0], a[1], b[0], b[1])
+    a, b = Point(a), Point(b)
+    _ensure_same_altitude(a, b)
+    return fast._s12(a.latitude, a.longitude, b.latitude, b.longitude)
+
+
+_set_ellipsoid = _geopy_distance.geodesic.set_ellipsoid
+
+
+def _known_geopy():
+    # __init__ and meters below repeat geopy internals that are identical in geopy 2.0 to 2.5.
+    # On any other version geodesic keeps geopy's own __init__ and meters (only measure is ours).
+    try:
+        major, minor = (int(x) for x in geopy.__version__.split(".")[:2])
+    except ValueError:
+        return False
+    return major == 2 and minor <= 5
+
+
+_KNOWN_GEOPY = _known_geopy()
 
 
 class geodesic(_geopy_distance.geodesic):
@@ -62,52 +104,43 @@ class geodesic(_geopy_distance.geodesic):
     ``destination()`` and anything else that uses it is geopy's own code.
     """
 
+    measure = _measure
+
     def __init__(self, *args, **kwargs):
-        # Most common call, geodesic((lat, lon), (lat, lon)) with floats (including numpy.float64) and no keywords:
-        # set the same attributes geopy 2.x would (WGS-84, kilometers = 0 + s12 + 0.0 == s12)
-        # without going through set_ellipsoid, Distance.__init__ and measure.
-        # Subclasses take the normal path so that their own measure() is used.
-        if len(args) == 2 and not kwargs and type(self) is geodesic:
-            a, b = args
-            if type(a) is tuple and type(b) is tuple and len(a) == 2 and len(b) == 2:
-                lat1, lon1 = a
-                lat2, lon2 = b
-                if (
-                    isinstance(lat1, float) and isinstance(lon1, float) and isinstance(lat2, float) and isinstance(lon2, float)
-                    and -90 <= lat1 <= 90 and -90 <= lat2 <= 90 and -180 <= lon1 <= 180 and -180 <= lon2 <= 180
-                ):
-                    self.ellipsoid_key = "WGS-84"
-                    self.ELLIPSOID = _WGS84
-                    self.geod = _WGS84_REF
-                    self._Distance__kilometers = _WGS84_FAST._s12(lat1, lon1, lat2, lon2)
-                    return
-        super().__init__(*args, **kwargs)
+        # The same steps as geodesic.__init__ and Distance.__init__ in geopy 2.0 to 2.5.
+        cls = type(self)
+        if len(args) == 2 and not kwargs and cls.measure is _measure and cls.set_ellipsoid is _set_ellipsoid:
+            # geodesic(a, b) with neither keywords nor overridden or mocked methods:
+            # what set_ellipsoid("WGS-84") and one measure() call would do, inlined
+            e = _ELLIPSOIDS["WGS-84"]
+            self.ellipsoid_key = "WGS-84"
+            self.ELLIPSOID = e
+            major, minor, f = e  # like geopy: fails unless the ellipsoid has 3 values
+            self._Distance__kilometers = _measure(self, args[0], args[1]) + 0.0
+            return
+        self.ellipsoid_key = None
+        self.ELLIPSOID = None
+        self.geod = None
+        self.set_ellipsoid(kwargs.pop("ellipsoid", "WGS-84"))
+        major, minor, f = self.ELLIPSOID  # like geopy: fails unless the ellipsoid has 3 values
+        kilometers = kwargs.pop("kilometers", 0)
+        if len(args) == 1:
+            kilometers += args[0]
+        elif len(args) > 1:
+            # util.pairwise() in geopy
+            for i in range(len(args) - 1):
+                kilometers += self.measure(args[i], args[i + 1])
+        kilometers += _units.kilometers(**kwargs)
+        self._Distance__kilometers = kilometers
 
     @property
     def meters(self):
-        # Same formula as geopy 2.x: units.meters(kilometers=km) == (km + 0.0) * 1000
-        return (self._Distance__kilometers + 0.0) * 1000
+        # geopy.units.meters(kilometers=km) is (km + 0.0) * 1000 in geopy 2.0 to 2.5;
+        # inlined because the call is a sixth of the time of geodesic(a, b).meters
+        return (self.kilometers + 0.0) * 1000
 
-    def measure(self, a, b):
-        e = self.ELLIPSOID
-        if e is _WGS84:
-            fast, self.geod = _WGS84_FAST, _WGS84_REF
-        else:
-            fast, self.geod = _geods(e[0], e[2])
-        # Most common input first: two (lat, lon) tuples of floats (numpy.float64 is a float subclass)
-        if type(a) is tuple and type(b) is tuple and len(a) == 2 and len(b) == 2:
-            lat1, lon1 = a
-            lat2, lon2 = b
-            if (
-                isinstance(lat1, float) and isinstance(lon1, float) and isinstance(lat2, float) and isinstance(lon2, float)
-                and -90 <= lat1 <= 90 and -90 <= lat2 <= 90 and -180 <= lon1 <= 180 and -180 <= lon2 <= 180
-            ):
-                return fast._s12(lat1, lon1, lat2, lon2)
-        if _plain(a) and _plain(b):
-            return fast._s12(a[0], a[1], b[0], b[1])
-        a, b = Point(a), Point(b)
-        _ensure_same_altitude(a, b)
-        return fast._s12(a.latitude, a.longitude, b.latitude, b.longitude)
+    if not _KNOWN_GEOPY:
+        del __init__, meters  # fall back to geopy's own
 
 
 GeodesicDistance = geodesic
