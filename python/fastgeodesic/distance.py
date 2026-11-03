@@ -62,18 +62,44 @@ class geodesic(_geopy_distance.geodesic):
     ``destination()`` and anything else that uses it is geopy's own code.
     """
 
+    def __init__(self, *args, **kwargs):
+        # Most common call, geodesic((lat, lon), (lat, lon)) with floats (including numpy.float64) and no keywords:
+        # set the same attributes geopy 2.x would (WGS-84, kilometers = 0 + s12 + 0.0 == s12)
+        # without going through set_ellipsoid, Distance.__init__ and measure.
+        # Subclasses take the normal path so that their own measure() is used.
+        if len(args) == 2 and not kwargs and type(self) is geodesic:
+            a, b = args
+            if type(a) is tuple and type(b) is tuple and len(a) == 2 and len(b) == 2:
+                lat1, lon1 = a
+                lat2, lon2 = b
+                if (
+                    isinstance(lat1, float) and isinstance(lon1, float) and isinstance(lat2, float) and isinstance(lon2, float)
+                    and -90 <= lat1 <= 90 and -90 <= lat2 <= 90 and -180 <= lon1 <= 180 and -180 <= lon2 <= 180
+                ):
+                    self.ellipsoid_key = "WGS-84"
+                    self.ELLIPSOID = _WGS84
+                    self.geod = _WGS84_REF
+                    self._Distance__kilometers = _WGS84_FAST._s12(lat1, lon1, lat2, lon2)
+                    return
+        super().__init__(*args, **kwargs)
+
+    @property
+    def meters(self):
+        # Same formula as geopy 2.x: units.meters(kilometers=km) == (km + 0.0) * 1000
+        return (self._Distance__kilometers + 0.0) * 1000
+
     def measure(self, a, b):
         e = self.ELLIPSOID
         if e is _WGS84:
             fast, self.geod = _WGS84_FAST, _WGS84_REF
         else:
             fast, self.geod = _geods(e[0], e[2])
-        # Most common input first: two (lat, lon) tuples of floats
+        # Most common input first: two (lat, lon) tuples of floats (numpy.float64 is a float subclass)
         if type(a) is tuple and type(b) is tuple and len(a) == 2 and len(b) == 2:
             lat1, lon1 = a
             lat2, lon2 = b
             if (
-                type(lat1) is float and type(lon1) is float and type(lat2) is float and type(lon2) is float
+                isinstance(lat1, float) and isinstance(lon1, float) and isinstance(lat2, float) and isinstance(lon2, float)
                 and -90 <= lat1 <= 90 and -90 <= lat2 <= 90 and -180 <= lon1 <= 180 and -180 <= lon2 <= 180
             ):
                 return fast._s12(lat1, lon1, lat2, lon2)

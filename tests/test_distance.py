@@ -160,3 +160,30 @@ def test_core_geodesic_pickle():
     g = pickle.loads(pickle.dumps(Geodesic(6377397.155, 1 / 299.1528128)))
     assert type(g) is Geodesic and (g.a, g.f) == (6377397.155, 1 / 299.1528128)
     assert pickle.loads(pickle.dumps(Geodesic.WGS84)).Inverse(35, 139, 36, 140) == Geodesic.WGS84.Inverse(35, 139, 36, 140)
+
+
+def test_fast_init_matches_geopy_attributes():
+    for a, b in [((35.36, 138.72), (35.68, 139.76)), ((-89.9, 179.9), (89.9, -179.9))]:
+        f, r = fast.geodesic(a, b), ref.geodesic(a, b)
+        assert set(vars(f)) == set(vars(r))
+        assert (f.ellipsoid_key, f.ELLIPSOID) == (r.ellipsoid_key, r.ELLIPSOID)
+        assert (f.geod.a, f.geod.f) == (r.geod.a, r.geod.f)
+        assert same_km(f.km, r.km)
+        assert f.meters == (f.km + 0.0) * 1000 and f.m == f.meters
+        assert f.meters == pytest.approx(r.meters, rel=1e-12, abs=1e-8)
+
+
+def test_meters_formula_matches_geopy_units():
+    from geopy import units
+
+    for km in [0.0, -0.0, 1e-9, 1.5, 12345.678, -3.0]:
+        assert fast.geodesic(km).meters == units.meters(kilometers=km)
+        assert str(fast.geodesic(km).meters) == str(ref.geodesic(km).meters)
+
+
+def test_subclass_uses_its_own_measure():
+    class Mine(fast.geodesic):
+        def measure(self, a, b):
+            return 42.0
+
+    assert Mine((35.0, 139.0), (36.0, 140.0)).km == 42.0

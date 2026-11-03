@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "fastgeodesic"
 version = "0.1.0"
-description = "Drop-in Rust replacement for geographiclib and geopy distance: same results, 18-32x faster"
+description = "Drop-in Rust replacement for geographiclib and geopy distance: same results, 32-54x faster"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 readme = "README.md"

@@ -1,6 +1,6 @@
 # fastgeodesic
 
-Drop-in Rust replacement for [geographiclib](https://pypi.org/project/geographiclib/) and the distance functions of [geopy](https://pypi.org/project/geopy/). Same API, same results, 18–32x faster.
+Drop-in Rust replacement for [geographiclib](https://pypi.org/project/geographiclib/) and the distance functions of [geopy](https://pypi.org/project/geopy/). Same API, same results, 32–54x faster.
 
 Replace `geopy` (or `geographiclib`) with `fastgeodesic` in the import. Nothing else changes.
 
@@ -27,9 +27,9 @@ Apple M1 Pro, Python 3.12, median of repeated runs.
 |---|---|---|---|
 | `Geodesic.WGS84.Inverse`, 50,000 random pairs | 2,107 ms | 65 ms | 32x |
 | `fastgeodesic.inverse_many`, same pairs | 2,107 ms | 33 ms | 64x |
-| `geopy.distance.geodesic`, 20,000 random pairs | 1,202 ms | 39 ms | 31x |
-| Total length of a 100,000-point GPS log with `geopy.distance.geodesic` | 3,566 ms | 159 ms | 22x |
-| Same GPS log with `numpy.float64` coordinates (pandas rows) | 3,622 ms | 203 ms | 18x |
+| `geopy.distance.geodesic`, 20,000 random pairs | 1,208 ms | 23 ms | 54x |
+| Total length of a 100,000-point GPS log with `geopy.distance.geodesic` | 3,652 ms | 80 ms | 46x |
+| Same GPS log with `numpy.float64` coordinates (pandas rows) | 3,660 ms | 85 ms | 43x |
 
 Short distances such as consecutive GPS points converge quickly even in pure Python, so the speedup there is smaller than for random pairs.
 
@@ -81,7 +81,7 @@ fastgeodesic.patch()    # replaces Geodesic in geographiclib.geodesic and geopy.
 fastgeodesic.unpatch()  # restores the originals
 ```
 
-It replaces exactly one name, `Geodesic`, in those two modules. Call it before other modules copy the name with `from geographiclib.geodesic import Geodesic`. The speedup is smaller than changing the import (9x instead of 22x on GPS logs) because geopy's own Python code still runs.
+It replaces exactly one name, `Geodesic`, in those two modules. Call it before other modules copy the name with `from geographiclib.geodesic import Geodesic`. The speedup is smaller than changing the import (9x instead of 46x on GPS logs) because geopy's own Python code still runs.
 
 ## Supported API
 
