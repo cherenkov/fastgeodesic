@@ -65,11 +65,10 @@
     <div id="bench"><p class="note">ランダムな地球上の2点の組で、本家と高速版の計算時間を比べます。</p></div>
 
     <h2>使い方</h2>
-<pre># 既存の geopy のコードはそのまま
-import fastgeodesic
-fastgeodesic.patch()   # この1行を足すだけ
+<pre># import の geopy を fastgeodesic に変えるだけ
+# from geopy.distance import geodesic
+from fastgeodesic.distance import geodesic
 
-from geopy.distance import geodesic
 geodesic((35.36, 138.73), (35.68, 139.77)).km</pre>
 <pre># import を差し替える場合
 from fastgeodesic.geodesic import Geodesic

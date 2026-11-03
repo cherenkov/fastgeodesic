@@ -17,6 +17,7 @@ from geopy import distance
 
 import fastgeodesic
 from fastgeodesic import Geodesic as Fast
+from fastgeodesic import distance as fast_distance
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))  # -I で起動しても隣の track.py を読めるように
@@ -73,11 +74,7 @@ def bench(q):
     t_many, r_many = timed(lambda: fastgeodesic.inverse_many(*cols))
 
     t_geopy, g_ref = timed(lambda: [distance.geodesic(c[:2], c[2:]).meters for c in pts])
-    fastgeodesic.patch()
-    try:
-        t_geopy_fast, g_fast = timed(lambda: [distance.geodesic(c[:2], c[2:]).meters for c in pts])
-    finally:
-        fastgeodesic.unpatch()
+    t_geopy_fast, g_fast = timed(lambda: [fast_distance.geodesic(c[:2], c[2:]).meters for c in pts])
 
     def cmp(a, b):
         return {"max_diff_m": max(abs(x - y) for x, y in zip(a, b)), "identical": sum(x == y for x, y in zip(a, b))}
@@ -87,7 +84,7 @@ def bench(q):
         "rows": [
             {"label": "geographiclib Geodesic.Inverse(1組ずつ)", "ref_ms": t_ref, "fast_ms": t_fast, **cmp(r_ref, r_fast)},
             {"label": "geographiclib → inverse_many(まとめて)", "ref_ms": t_ref, "fast_ms": t_many, **cmp(r_ref, r_many)},
-            {"label": "geopy distance.geodesic(patch() で差し替え)", "ref_ms": t_geopy, "fast_ms": t_geopy_fast, **cmp(g_ref, g_fast)},
+            {"label": "geopy distance.geodesic → fastgeodesic.distance", "ref_ms": t_geopy, "fast_ms": t_geopy_fast, **cmp(g_ref, g_fast)},
         ],
     }
 

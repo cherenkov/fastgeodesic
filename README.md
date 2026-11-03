@@ -1,13 +1,15 @@
 # fastgeodesic
 
-Drop-in Rust replacement for [geographiclib](https://pypi.org/project/geographiclib/) and the distance functions of [geopy](https://pypi.org/project/geopy/). Same API, same results, 9–32x faster. Your existing code does not change.
+Drop-in Rust replacement for [geographiclib](https://pypi.org/project/geographiclib/) and the distance functions of [geopy](https://pypi.org/project/geopy/). Same API, same results, 18–32x faster.
+
+Replace `geopy` (or `geographiclib`) with `fastgeodesic` in the import. Nothing else changes.
 
 ```python
-import fastgeodesic
-fastgeodesic.patch()  # add this one line
-
-# existing code, unchanged
+# before
 from geopy.distance import geodesic
+# after
+from fastgeodesic.distance import geodesic
+
 geodesic((35.3606, 138.7274), (35.6812, 139.7671)).meters
 ```
 
@@ -25,27 +27,31 @@ Apple M1 Pro, Python 3.12, median of repeated runs.
 |---|---|---|---|
 | `Geodesic.WGS84.Inverse`, 50,000 random pairs | 2,107 ms | 65 ms | 32x |
 | `fastgeodesic.inverse_many`, same pairs | 2,107 ms | 33 ms | 64x |
-| `geopy.distance.geodesic`, 20,000 random pairs | 1,224 ms | 87 ms | 14x |
-| Total length of a 100,000-point GPS log with geopy | 3,718 ms | 407 ms | 9.1x |
+| `geopy.distance.geodesic`, 20,000 random pairs | 1,216 ms | 50 ms | 24x |
+| Total length of a 100,000-point GPS log with `geopy.distance.geodesic` | 3,623 ms | 199 ms | 18x |
+| Same GPS log with `numpy.float64` coordinates (pandas rows) | 3,650 ms | 215 ms | 17x |
 
 Short distances such as consecutive GPS points converge quickly even in pure Python, so the speedup there is smaller than for random pairs.
 
 ## Accuracy
 
-Results match geographiclib to the last few bits. On 100,000 random pairs, 59% of `Inverse` results are bit-for-bit identical, and the largest difference is 7.5e-9 m in distance and 7.4e-13 degrees in azimuth. The test suite compares every output key against geographiclib, including poles, the antimeridian, near-antipodal points, `LONG_UNROLL` and a non-WGS84 ellipsoid.
+Results match geographiclib to the last few bits. On 100,000 random pairs, 59% of `Inverse` results are bit-for-bit identical, and the largest difference is 7.5e-9 m in distance and 7.4e-13 degrees in azimuth. The test suite compares every output key against geographiclib, including poles, the antimeridian, near-antipodal points, `LONG_UNROLL` and a non-WGS84 ellipsoid. `fastgeodesic.distance` is tested against `geopy.distance` with floats, ints, lists, strings, `Point` objects, altitudes, `numpy.float64`, several points, other ellipsoids and `destination()`. Invalid input raises the same exception with the same message.
 
 ## Usage
 
-Patch geographiclib and geopy in place. Code that imports them, including other libraries, uses fastgeodesic from then on.
+The rule is always the same: replace the package name in the import.
 
-```python
-import fastgeodesic
-fastgeodesic.patch()
-...
-fastgeodesic.unpatch()  # back to the originals
-```
+| Before | After |
+|---|---|
+| `from geopy.distance import geodesic` | `from fastgeodesic.distance import geodesic` |
+| `from geopy import distance` | `from fastgeodesic import distance` |
+| `from geographiclib.geodesic import Geodesic` | `from fastgeodesic.geodesic import Geodesic` |
 
-Or import it directly, with the same API as `geographiclib.geodesic`:
+Only the files where you change the import are affected. geopy and geographiclib themselves are not modified, so other code in the same program keeps using them.
+
+`fastgeodesic.distance.geodesic` is a subclass of `geopy.distance.geodesic`, so `.km`, `.miles`, `.destination()`, arithmetic, comparisons, `ellipsoid=` and `isinstance` checks work as before. The other names in `fastgeodesic.distance` (`great_circle`, `Distance`, `ELLIPSOIDS`, ...) are geopy's own objects.
+
+`fastgeodesic.geodesic.Geodesic` has the same API as `geographiclib.geodesic.Geodesic`:
 
 ```python
 from fastgeodesic.geodesic import Geodesic
@@ -60,8 +66,22 @@ Geodesic(6377397.155, 1 / 299.1528128)  # any ellipsoid
 For many pairs at once:
 
 ```python
+import fastgeodesic
 fastgeodesic.inverse_many(lat1, lon1, lat2, lon2)  # list of distances in meters, WGS84
 ```
+
+### When you cannot change the import
+
+If geopy is called inside a library you do not control, `patch()` makes geographiclib and geopy compute with fastgeodesic for the whole program:
+
+```python
+import fastgeodesic
+fastgeodesic.patch()    # replaces Geodesic in geographiclib.geodesic and geopy.distance
+...
+fastgeodesic.unpatch()  # restores the originals
+```
+
+It replaces exactly one name, `Geodesic`, in those two modules. Call it before other modules copy the name with `from geographiclib.geodesic import Geodesic`. The speedup is smaller than changing the import (9x instead of 18x on GPS logs) because geopy's own Python code still runs.
 
 ## Supported API
 
@@ -72,7 +92,11 @@ fastgeodesic.inverse_many(lat1, lon1, lat2, lon2)  # list of distances in meters
 | `Direct(lat1, lon1, azi1, s12, outmask)` | Supported |
 | `ArcDirect`, `Line`, `InverseLine`, `DirectLine`, `Polygon` | Not yet |
 
-`patch()` replaces `Geodesic` in `geographiclib.geodesic` and `geopy.distance`. Call it before other modules copy the name with `from geographiclib.geodesic import Geodesic`.
+| geopy.distance | Status |
+|---|---|
+| `geodesic`, `distance`, `GeodesicDistance`, including `destination()` and `ellipsoid=` | Supported |
+| `great_circle`, `Distance`, `ELLIPSOIDS` and the rest | geopy's own objects, passed through |
+
 
 ## Install
 

@@ -1,7 +1,7 @@
 """GPS ログの総距離を geopy で計算する。進み具合を1行ずつ JSON で標準出力に出す。
 
 使い方: python -I race_worker.py <ref|fast> <点の数>
-ref は geopy そのまま、fast は fastgeodesic.patch() を1行足しただけ。計算のコードは同じ。
+ref は geopy そのまま、fast は import の geopy を fastgeodesic に変えただけ。計算のコードは同じ。
 """
 
 import json
@@ -15,11 +15,9 @@ from track import make_track  # noqa: E402
 impl, n = sys.argv[1], int(sys.argv[2])
 
 if impl == "fast":
-    import fastgeodesic
-
-    fastgeodesic.patch()
-
-from geopy import distance
+    from fastgeodesic import distance
+else:
+    from geopy import distance
 
 track = make_track(n)
 emit_every = max(1, n // 200)
