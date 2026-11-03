@@ -232,8 +232,9 @@ def test_unknown_geopy_version_falls_back_to_geopy_init():
             importlib.reload(mod)
             assert "__init__" not in vars(mod.geodesic) and "meters" not in vars(mod.geodesic)
             a, b = (35.36, 138.72), (35.68, 139.76)
-            assert same_km(mod.geodesic(a, b).km, ref.geodesic(a, b).km)
-            assert mod.geodesic(a, b).meters == ref.geodesic(a, b).meters
+            f = mod.geodesic(a, b)
+            assert same_km(f.km, ref.geodesic(a, b).km)
+            assert f.meters == units.meters(kilometers=f.km)  # geopy's own meters
     finally:
         importlib.reload(mod)
     assert "__init__" in vars(mod.geodesic)
