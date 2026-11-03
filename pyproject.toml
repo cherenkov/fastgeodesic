@@ -14,7 +14,13 @@ keywords = ["geodesic", "geographiclib", "geopy", "distance", "wgs84", "gps", "r
 [project.optional-dependencies]
 # fastgeodesic.distance subclasses geopy.distance.geodesic; tested with geopy 2.0 to 2.5
 geopy = ["geopy>=2.0,<3"]
-test = ["pytest", "geographiclib", "geopy>=2.0,<3", "numpy"]
+test = [
+    "pytest",
+    "geographiclib",
+    "geopy>=2.0,<3",
+    # numpy has no prebuilt wheels on armv7, s390x and ppc64le; its test is skipped there
+    'numpy; platform_machine == "x86_64" or platform_machine == "AMD64" or platform_machine == "arm64" or platform_machine == "aarch64"',
+]
 
 [tool.maturin]
 python-source = "python"
