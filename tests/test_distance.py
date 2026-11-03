@@ -13,6 +13,8 @@ from geopy.point import Point
 
 from fastgeodesic import distance as fast
 
+from conftest import samples
+
 KM_TOL = 1e-11  # kilometers, i.e. 1e-8 m
 
 
@@ -50,7 +52,7 @@ def test_numpy_scalars():
 
 def test_random_pairs():
     rnd = random.Random(1)
-    for _ in range(20000):
+    for _ in range(samples(20000)):
         a = (rnd.uniform(-90, 90), rnd.uniform(-180, 180))
         b = (rnd.uniform(-90, 90), rnd.uniform(-180, 180))
         assert same_km(fast.geodesic(a, b).km, ref.geodesic(a, b).km), (a, b)

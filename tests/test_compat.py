@@ -7,6 +7,8 @@ from geographiclib.geodesic import Geodesic as Ref
 import fastgeodesic
 from fastgeodesic import Geodesic as Fast
 
+from conftest import samples
+
 TOL = {"s12": 1e-8, "m12": 1e-8, "M12": 1e-12, "M21": 1e-12, "S12": 1e-2}
 DEG_TOL = 1e-11
 
@@ -31,7 +33,7 @@ def close(key, a, b):
 
 @pytest.mark.parametrize("mask", [Ref.STANDARD, Ref.DISTANCE, Ref.ALL, Ref.STANDARD | Ref.LONG_UNROLL])
 def test_inverse_matches(mask):
-    for c in cases(20000):
+    for c in cases(samples(20000)):
         r, f = Ref.WGS84.Inverse(*c, mask), Fast.WGS84.Inverse(*c, mask)
         assert r.keys() == f.keys(), c
         for k in r:
@@ -41,7 +43,7 @@ def test_inverse_matches(mask):
 @pytest.mark.parametrize("mask", [Ref.STANDARD, Ref.LATITUDE | Ref.LONGITUDE, Ref.ALL, Ref.STANDARD | Ref.LONG_UNROLL])
 def test_direct_matches(mask):
     rnd = random.Random(2)
-    for _ in range(20000):
+    for _ in range(samples(20000)):
         c = (rnd.uniform(-90, 90), rnd.uniform(-180, 180), rnd.uniform(-180, 180), rnd.uniform(0, 2e7))
         r, f = Ref.WGS84.Direct(*c, mask), Fast.WGS84.Direct(*c, mask)
         assert r.keys() == f.keys(), c
@@ -52,7 +54,7 @@ def test_direct_matches(mask):
 def test_other_ellipsoid():
     r, f = Ref(6377397.155, 1 / 299.1528128), Fast(6377397.155, 1 / 299.1528128)  # Bessel 1841
     assert (f.a, f.f) == (r.a, r.f)
-    for c in cases(2000, seed=3):
+    for c in cases(samples(2000), seed=3):
         assert close("s12", f.Inverse(*c)["s12"], r.Inverse(*c)["s12"])
 
 
@@ -65,7 +67,7 @@ def test_constants_match():
 def test_geopy_patch():
     from geopy import distance
 
-    pts = cases(5000, seed=4)
+    pts = cases(samples(5000), seed=4)
     before = [distance.geodesic(c[:2], c[2:]).meters for c in pts if abs(c[0]) <= 90 and abs(c[2]) <= 90]
     fastgeodesic.patch()
     try:
@@ -81,7 +83,7 @@ def test_geopy_patch():
 
 
 def test_inverse_many():
-    pts = cases(5000, seed=5)[:5000]
+    pts = cases(samples(5000), seed=5)
     got = fastgeodesic.inverse_many(*zip(*pts))
     for c, s in zip(pts, got):
         assert close("s12", s, Ref.WGS84.Inverse(*c, Ref.DISTANCE)["s12"])
