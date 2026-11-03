@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.5,<2"]
+build-backend = "maturin"
+
+[project]
+name = "fastgeodesic"
+version = "0.0.1"
+description = "Drop-in Rust replacement for geographiclib and geopy distance: same results, 10-30x faster"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+readme = "README.md"
+keywords = ["geodesic", "geographiclib", "geopy", "distance", "wgs84", "gps", "rust"]
+
+[tool.maturin]
+python-source = "python"
+module-name = "fastgeodesic._core"
+features = ["pyo3/extension-module"]

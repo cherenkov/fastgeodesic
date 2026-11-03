@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fastgeodesic デモ</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" integrity="sha384-uTttxo/aOKbdE5RlD/SPzSDoDmNvGlUYPjONi2MN/b7c9HPSvW07OIuyP7uL6jxK" crossorigin="anonymous">
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js" integrity="sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFmCJBL0dgdvGp" crossorigin="anonymous"></script>
+<style>
+  :root { --fg:#1f2328; --muted:#59636e; --line:#d1d9e0; --bg:#fff; --soft:#f6f8fa; --accent:#0969da; --good:#1a7f37; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e6edf3; --muted:#9198a1; --line:#3d444d; --bg:#0d1117; --soft:#151b23; --accent:#4493f8; --good:#3fb950; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif; font-size:14px; line-height:1.6; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:18px; margin:0; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:13px; }
+  .wrap { display:grid; grid-template-columns: 1fr 460px; height:calc(100vh - 64px); }
+  #map { height:100%; }
+  aside { overflow-y:auto; padding:16px 18px; border-left:1px solid var(--line); }
+  h2 { font-size:15px; margin:18px 0 8px; }
+  h2:first-child { margin-top:0; }
+  .presets button, .bench button { font:inherit; margin:0 6px 6px 0; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--soft); color:var(--fg); cursor:pointer; }
+  .presets button:hover, .bench button:hover { border-color:var(--accent); }
+  .bench button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 10px; }
+  th, td { border:1px solid var(--line); padding:4px 8px; text-align:left; }
+  th { background:var(--soft); font-weight:600; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .big { font-size:22px; font-weight:700; color:var(--good); }
+  .note { color:var(--muted); font-size:12px; }
+  .ok { color:var(--good); font-weight:600; }
+  pre { background:var(--soft); border:1px solid var(--line); border-radius:6px; padding:10px 12px; font-size:12px; overflow-x:auto; }
+  select { font:inherit; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); }
+  .hint { color:var(--muted); font-size:12px; margin:0 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>fastgeodesic デモ <span class="note">(未公開)</span> <a href="/race" style="font-size:13px;font-weight:400;margin-left:12px">本家と改善版を同時に走らせる →</a></h1>
+  <p>geographiclib・geopy と同じ使い方のまま、Rust で速くした距離計算。左の地図、右の数字は、すべてこのパソコンでいま計算した結果です。</p>
+</header>
+<div class="wrap">
+  <div id="map"></div>
+  <aside>
+    <h2>2点間の距離</h2>
+    <p class="hint">地図をクリックすると始点・終点を順に置けます。</p>
+    <div class="presets">
+      <button data-p="35.3606,138.7274,35.6812,139.7671">富士山 → 東京駅</button>
+      <button data-p="43.0642,141.3469,26.2124,127.6809">札幌 → 那覇</button>
+      <button data-p="35.5494,139.7798,40.6413,-73.7781">羽田 → ニューヨーク</button>
+      <button data-p="35.5494,139.7798,-23.4356,-46.4731">羽田 → サンパウロ</button>
+    </div>
+    <div id="pair"><p class="note">計算中…</p></div>
+
+    <h2>速度の比較</h2>
+    <div class="bench">
+      <label>件数 <select id="n">
+        <option value="10000">1万組</option>
+        <option value="20000" selected>2万組</option>
+        <option value="50000">5万組</option>
+        <option value="100000">10万組(本家だと約10秒)</option>
+      </select></label>
+      <button class="primary" id="run">計測する</button>
+    </div>
+    <div id="bench"><p class="note">ランダムな地球上の2点の組で、本家と高速版の計算時間を比べます。</p></div>
+
+    <h2>使い方</h2>
+<pre># 既存の geopy のコードはそのまま
+import fastgeodesic
+fastgeodesic.patch()   # この1行を足すだけ
+
+from geopy.distance import geodesic
+geodesic((35.36, 138.73), (35.68, 139.77)).km</pre>
+<pre># import を差し替える場合
+from fastgeodesic.geodesic import Geodesic
+Geodesic.WGS84.Inverse(35.36, 138.73, 35.68, 139.77)["s12"]</pre>
+    <p class="note">地図: 国土地理院 淡色地図。計算は WGS84 楕円体。</p>
+  </aside>
+</div>
+<script>
+const map = new maplibregl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    sources: { gsi: { type: 'raster', tiles: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 18,
+      attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>' } },
+    layers: [{ id: 'gsi', type: 'raster', source: 'gsi' }],
+  },
+  center: [139.2, 35.5], zoom: 7, renderWorldCopies: true,
+});
+
+const fmt = (x, d) => Number(x).toLocaleString('ja-JP', { minimumFractionDigits: d, maximumFractionDigits: d });
+const sci = x => x === 0 ? '0(全桁一致)' : x.toExponential(1);
+let pts = [];
+let markers = [];
+
+function setPoints(p) {
+  pts = p;
+  markers.forEach(m => m.remove());
+  markers = pts.map((q, i) => new maplibregl.Marker({ color: i ? '#cf222e' : '#0969da' }).setLngLat([q[1], q[0]]).addTo(map));
+  if (pts.length === 2) compute();
+}
+
+async function compute() {
+  const [[lat1, lon1], [lat2, lon2]] = pts;
+  document.getElementById('pair').innerHTML = '<p class="note">計算中…</p>';
+  const r = await (await fetch(`/api/pair?lat1=${lat1}&lon1=${lon1}&lat2=${lat2}&lon2=${lon2}`)).json();
+  const line = { type: 'Feature', geometry: { type: 'LineString', coordinates: r.path } };
+  const straight = { type: 'Feature', geometry: { type: 'LineString', coordinates: [r.path[0], r.path[r.path.length - 1]] } };
+  map.getSource('geo').setData({ type: 'FeatureCollection', features: [line] });
+  map.getSource('straight').setData({ type: 'FeatureCollection', features: [straight] });
+  const b = new maplibregl.LngLatBounds(r.path[0], r.path[0]);
+  r.path.forEach(c => b.extend(c));
+  map.fitBounds(b, { padding: 60, duration: 600 });
+  const row = (label, k, d, unit, scale = 1) =>
+    `<tr><td>${label}</td><td class="num">${fmt(r.ref[k] * scale, d)}${unit}</td><td class="num">${fmt(r.fast[k] * scale, d)}${unit}</td><td class="num">${sci(r.diff[k] * scale)}</td></tr>`;
+  document.getElementById('pair').innerHTML = `
+    <table>
+      <tr><th></th><th>本家</th><th>高速版</th><th>差</th></tr>
+      ${row('距離', 's12', 3, ' m')}
+      ${row('出発の方位', 'azi1', 6, '°')}
+      ${row('到着の方位', 'azi2', 6, '°')}
+      <tr><td>1回の計算時間</td><td class="num">${fmt(r.us_ref, 2)} µs</td><td class="num">${fmt(r.us_fast, 2)} µs</td><td class="num"></td></tr>
+    </table>
+    <p><span class="big">${fmt(r.us_ref / r.us_fast, 1)}倍</span> 速い ${r.identical ? '<span class="ok">・結果は全桁一致</span>' : ''}</p>
+    <p class="note">青い実線が測地線(楕円体上の最短経路)、点線は地図上の直線。遠い2点ほど差が大きい。</p>`;
+}
+
+async function runBench() {
+  const n = document.getElementById('n').value;
+  const btn = document.getElementById('run');
+  btn.disabled = true; btn.textContent = '計測中…';
+  document.getElementById('bench').innerHTML = `<p class="note">${fmt(n, 0)}組を、本家と高速版の両方で計算しています。本家の分だけ時間がかかります。</p>`;
+  try {
+    const r = await (await fetch(`/api/bench?n=${n}`)).json();
+    document.getElementById('bench').innerHTML = `
+      <table>
+        <tr><th>処理(${fmt(r.n, 0)}組)</th><th>本家</th><th>高速版</th><th>倍率</th></tr>
+        ${r.rows.map(x => `<tr><td>${x.label}</td><td class="num">${fmt(x.ref_ms, 0)} ms</td><td class="num">${fmt(x.fast_ms, 0)} ms</td><td class="num"><b>${fmt(x.ref_ms / x.fast_ms, 1)}倍</b></td></tr>`).join('')}
+      </table>
+      <table>
+        <tr><th>結果の一致</th><th>全桁一致</th><th>距離の差の最大</th></tr>
+        ${r.rows.map(x => `<tr><td>${x.label}</td><td class="num">${fmt(x.identical / r.n * 100, 1)}%</td><td class="num">${sci(x.max_diff_m)} m</td></tr>`).join('')}
+      </table>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '計測する';
+  }
+}
+
+map.on('load', () => {
+  map.addSource('geo', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addSource('straight', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({ id: 'straight', type: 'line', source: 'straight', paint: { 'line-color': '#59636e', 'line-width': 2, 'line-dasharray': [2, 2] } });
+  map.addLayer({ id: 'geo', type: 'line', source: 'geo', paint: { 'line-color': '#0969da', 'line-width': 3 } });
+  setPoints([[35.3606, 138.7274], [35.6812, 139.7671]]);
+});
+map.on('click', e => {
+  const p = [e.lngLat.lat, e.lngLat.wrap().lng];
+  setPoints(pts.length === 2 ? [p] : [...pts, p]);
+});
+document.querySelectorAll('.presets button').forEach(b => b.onclick = () => {
+  const v = b.dataset.p.split(',').map(Number);
+  setPoints([[v[0], v[1]], [v[2], v[3]]]);
+});
+document.getElementById('run').onclick = runBench;
+</script>
+</body>
+</html>

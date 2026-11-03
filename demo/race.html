@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fastgeodesic 本家と改善版の比較</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" integrity="sha384-uTttxo/aOKbdE5RlD/SPzSDoDmNvGlUYPjONi2MN/b7c9HPSvW07OIuyP7uL6jxK" crossorigin="anonymous">
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js" integrity="sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFmCJBL0dgdvGp" crossorigin="anonymous"></script>
+<style>
+  :root { --fg:#1f2328; --muted:#59636e; --line:#d1d9e0; --bg:#fff; --soft:#f6f8fa; --accent:#0969da; --good:#1a7f37; --ref:#9a6700; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#e6edf3; --muted:#9198a1; --line:#3d444d; --bg:#0d1117; --soft:#151b23; --accent:#4493f8; --good:#3fb950; --ref:#d29922; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif; font-size:14px; line-height:1.6; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header a { color:var(--accent); font-size:13px; }
+  .controls { display:flex; gap:10px; align-items:center; margin-left:auto; }
+  select, button { font:inherit; padding:5px 12px; border-radius:6px; border:1px solid var(--line); background:var(--soft); color:var(--fg); }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; cursor:pointer; font-weight:600; }
+  button:disabled { opacity:.6; cursor:default; }
+  .lead { padding:10px 20px 0; color:var(--muted); font-size:13px; margin:0; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:14px 20px 24px; }
+  .panel { border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .panel h2 { font-size:15px; margin:0; padding:10px 14px; border-bottom:1px solid var(--line); background:var(--soft); }
+  .panel.ref h2 span { color:var(--ref); } .panel.fast h2 span { color:var(--good); }
+  .map { height:360px; }
+  .stats { padding:12px 14px; }
+  .bar { height:10px; background:var(--soft); border:1px solid var(--line); border-radius:999px; overflow:hidden; margin:4px 0 10px; }
+  .bar i { display:block; height:100%; width:0; }
+  .ref .bar i { background:var(--ref); } .fast .bar i { background:var(--good); }
+  .nums { display:grid; grid-template-columns:auto 1fr; gap:2px 14px; font-variant-numeric:tabular-nums; }
+  .nums dt { color:var(--muted); } .nums dd { margin:0; text-align:right; }
+  .time { font-size:28px; font-weight:700; }
+  pre { margin:10px 0 0; background:var(--soft); border:1px solid var(--line); border-radius:6px; padding:8px 10px; font-size:12px; overflow-x:auto; }
+  pre b { color:var(--good); }
+  #result { margin:0 20px 24px; padding:12px 16px; border:1px solid var(--line); border-radius:8px; display:none; }
+  #result .big { font-size:24px; font-weight:700; color:var(--good); }
+  .note { color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>本家と改善版を同時に走らせる</h1>
+  <a href="/">← 2点の比較へ</a>
+  <div class="controls">
+    <label>GPS ログの点数 <select id="n">
+      <option value="20000">2万点(約6時間分)</option>
+      <option value="100000" selected>10万点(約28時間分)</option>
+      <option value="300000">30万点(約3.5日分)</option>
+    </select></label>
+    <button class="primary" id="start">スタート</button>
+  </div>
+</header>
+<p class="lead">1秒ごとに記録した GPS ログの総距離を、geopy で隣り合う2点ずつ足して求めます。左右は同じコードで、改善版は <code>fastgeodesic.patch()</code> の1行を足しただけです。左右は別々のプロセスで同時に動いています。</p>
+<div class="grid">
+  <section class="panel ref">
+    <h2><span>●</span> 本家(geopy + geographiclib そのまま)</h2>
+    <div class="map" id="map-ref"></div>
+    <div class="stats">
+      <div class="time" id="t-ref">0.00 秒</div>
+      <div class="bar"><i id="b-ref"></i></div>
+      <dl class="nums"><dt>計算した組</dt><dd id="i-ref">0</dd><dt>総距離</dt><dd id="d-ref">-</dd><dt>1組あたり</dt><dd id="u-ref">-</dd></dl>
+<pre>from geopy import distance
+
+total = 0.0
+for i in range(1, len(track)):
+    total += distance.geodesic(track[i-1], track[i]).meters</pre>
+    </div>
+  </section>
+  <section class="panel fast">
+    <h2><span>●</span> 改善版(fastgeodesic.patch() を足しただけ)</h2>
+    <div class="map" id="map-fast"></div>
+    <div class="stats">
+      <div class="time" id="t-fast">0.00 秒</div>
+      <div class="bar"><i id="b-fast"></i></div>
+      <dl class="nums"><dt>計算した組</dt><dd id="i-fast">0</dd><dt>総距離</dt><dd id="d-fast">-</dd><dt>1組あたり</dt><dd id="u-fast">-</dd></dl>
+<pre><b>import fastgeodesic
+fastgeodesic.patch()</b>
+from geopy import distance
+
+total = 0.0
+for i in range(1, len(track)):
+    total += distance.geodesic(track[i-1], track[i]).meters</pre>
+    </div>
+  </section>
+</div>
+<div id="result"></div>
+<p class="note" style="padding:0 20px 20px">時間は計算部分だけを各プロセスの中で測ったもの(Python の起動と import は含まない)。地図: 国土地理院 淡色地図。軌跡は乱数で作った山歩き風のデータ。</p>
+<script>
+const style = {
+  version: 8,
+  sources: { gsi: { type: 'raster', tiles: ['https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 18,
+    attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>' } },
+  layers: [{ id: 'gsi', type: 'raster', source: 'gsi' }],
+};
+const color = { ref: getComputedStyle(document.documentElement).getPropertyValue('--ref').trim() || '#9a6700',
+                fast: getComputedStyle(document.documentElement).getPropertyValue('--good').trim() || '#1a7f37' };
+const maps = {};
+const ready = {};
+for (const k of ['ref', 'fast']) {
+  maps[k] = new maplibregl.Map({ container: `map-${k}`, style, center: [138.7274, 35.3606], zoom: 12, attributionControl: { compact: true } });
+  ready[k] = new Promise(res => maps[k].on('load', () => {
+    maps[k].addSource('all', { type: 'geojson', data: line([]) });
+    maps[k].addSource('done', { type: 'geojson', data: line([]) });
+    maps[k].addLayer({ id: 'all', type: 'line', source: 'all', paint: { 'line-color': '#8c959f', 'line-width': 1.5, 'line-opacity': .5 } });
+    maps[k].addLayer({ id: 'done', type: 'line', source: 'done', paint: { 'line-color': color[k], 'line-width': 3 } });
+    res();
+  }));
+}
+function line(coords) { return { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } }; }
+const fmt = (x, d = 0) => Number(x).toLocaleString('ja-JP', { minimumFractionDigits: d, maximumFractionDigits: d });
+const $ = id => document.getElementById(id);
+
+let track = null;
+async function loadTrack(n) {
+  track = await (await fetch(`/api/track?n=${n}`)).json();
+  await Promise.all([ready.ref, ready.fast]);
+  const b = new maplibregl.LngLatBounds(track.coords[0], track.coords[0]);
+  track.coords.forEach(c => b.extend(c));
+  for (const k of ['ref', 'fast']) {
+    maps[k].getSource('all').setData(line(track.coords));
+    maps[k].getSource('done').setData(line([]));
+    maps[k].fitBounds(b, { padding: 24, duration: 0 });
+  }
+}
+
+function reset() {
+  for (const k of ['ref', 'fast']) {
+    $(`t-${k}`).textContent = '0.00 秒'; $(`b-${k}`).style.width = '0';
+    $(`i-${k}`).textContent = '0'; $(`d-${k}`).textContent = '-'; $(`u-${k}`).textContent = '-';
+  }
+  $('result').style.display = 'none';
+}
+
+function run(k, n) {
+  return new Promise(resolve => {
+    const es = new EventSource(`/api/race?impl=${k}&n=${n}`);
+    let last = 0;
+    es.onmessage = ev => {
+      const m = JSON.parse(ev.data);
+      if (m.type === 'start') return;
+      $(`t-${k}`).textContent = `${fmt(m.ms / 1000, 2)} 秒`;
+      $(`b-${k}`).style.width = `${(m.i / (n - 1)) * 100}%`;
+      $(`i-${k}`).textContent = fmt(m.i);
+      $(`d-${k}`).textContent = `${fmt(m.total / 1000, 3)} km`;
+      $(`u-${k}`).textContent = `${fmt(m.ms * 1000 / m.i, 2)} µs`;
+      const now = performance.now();
+      if (m.type === 'done' || now - last > 50) {
+        last = now;
+        maps[k].getSource('done').setData(line(track.coords.slice(0, Math.floor(m.i / track.step) + 1)));
+      }
+      if (m.type === 'done') { es.close(); resolve(m); }
+    };
+    es.onerror = () => { es.close(); resolve(null); };
+  });
+}
+
+$('n').onchange = () => { reset(); loadTrack($('n').value); };
+$('start').onclick = async () => {
+  const n = Number($('n').value);
+  const btn = $('start');
+  btn.disabled = true; btn.textContent = '計算中…';
+  reset();
+  await loadTrack(n);
+  const [r, f] = await Promise.all([run('ref', n), run('fast', n)]);
+  btn.disabled = false; btn.textContent = 'もう一度';
+  if (r && f) {
+    const diff = Math.abs(r.total - f.total);
+    $('result').innerHTML = `<span class="big">${fmt(r.ms / f.ms, 1)}倍</span> 速い。
+      本家 ${fmt(r.ms / 1000, 2)} 秒 → 改善版 ${fmt(f.ms / 1000, 2)} 秒。
+      総距離は 本家 ${fmt(r.total, 6)} m、改善版 ${fmt(f.total, 6)} m(差 ${diff === 0 ? '0、全桁一致' : diff.toExponential(1) + ' m'})。`;
+    $('result').style.display = 'block';
+  }
+};
+loadTrack($('n').value);
+</script>
+</body>
+</html>

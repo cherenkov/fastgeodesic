@@ -1,0 +1,18 @@
+[package]
+name = "fastgeodesic"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.25", features = ["extension-module", "abi3-py39"] }
+geographiclib-rs = "0.2.7"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
