@@ -101,9 +101,13 @@ It replaces exactly one name, `Geodesic`, in those two modules. Call it before o
 
 ## Install
 
-`fastgeodesic.distance` needs geopy 2.x, which you already have if you are replacing geopy imports. `pip install "fastgeodesic[geopy]"` installs it too.
+```sh
+pip install fastgeodesic
+```
 
-Not on PyPI yet. To build from source you need a Rust toolchain:
+Prebuilt wheels for Linux, macOS and Windows on x86_64 and ARM, Python 3.9 and later. `fastgeodesic.distance` needs geopy 2.x, which you already have if you are replacing geopy imports; `pip install "fastgeodesic[geopy]"` installs it too.
+
+To build from source you need a Rust toolchain:
 
 ```sh
 pip install maturin

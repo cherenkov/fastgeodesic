@@ -4,12 +4,16 @@ build-backend = "maturin"
 
 [project]
 name = "fastgeodesic"
-version = "0.0.1"
+version = "0.1.0"
 description = "Drop-in Rust replacement for geographiclib and geopy distance: same results, 18-32x faster"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 readme = "README.md"
 keywords = ["geodesic", "geographiclib", "geopy", "distance", "wgs84", "gps", "rust"]
+
+[project.urls]
+Repository = "https://github.com/cherenkov/fastgeodesic"
+Issues = "https://github.com/cherenkov/fastgeodesic/issues"
 
 [project.optional-dependencies]
 # fastgeodesic.distance subclasses geopy.distance.geodesic; tested with geopy 2.0 to 2.5
