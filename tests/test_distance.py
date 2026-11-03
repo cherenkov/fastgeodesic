@@ -76,7 +76,7 @@ def test_multiple_points_and_kwargs():
     assert fast.geodesic(kilometers=5).km == ref.geodesic(kilometers=5).km
 
 
-@pytest.mark.parametrize("ellipsoid", ["GRS-80", "Intl 1924", (6377.397155, 6356.078963, 1 / 299.1528128)])
+@pytest.mark.parametrize("ellipsoid", ["GRS-80", "Intl 1924", (6377.397155, 6356.078963, 1 / 299.1528128), [6377.397155, 6356.078963, 1 / 299.1528128]])
 def test_other_ellipsoids(ellipsoid):
     a, b = (35.36, 138.72), (40.64, -73.77)
     assert same_km(fast.geodesic(a, b, ellipsoid=ellipsoid).km, ref.geodesic(a, b, ellipsoid=ellipsoid).km)
@@ -112,3 +112,51 @@ def test_geopy_untouched():
 
     assert ref.geodesic is not fast.geodesic
     assert ref.Geodesic is Geodesic
+
+
+def test_pickle_and_copy():
+    import copy
+    import pickle
+
+    f = fast.geodesic((35.0, 139.0), (36.0, 140.0), ellipsoid="GRS-80")
+    for g in (pickle.loads(pickle.dumps(f)), copy.deepcopy(f), copy.copy(f)):
+        assert g.km == f.km and g.ELLIPSOID == f.ELLIPSOID
+        assert same_km(g.destination((35.0, 139.0), 45).latitude, f.destination((35.0, 139.0), 45).latitude)
+
+
+def test_geod_is_geographiclib():
+    from geographiclib.geodesic import Geodesic
+
+    f, r = fast.geodesic((35.0, 139.0), (36.0, 140.0)), ref.geodesic((35.0, 139.0), (36.0, 140.0))
+    assert type(f.geod) is Geodesic and (f.geod.a, f.geod.f) == (r.geod.a, r.geod.f)
+    assert hasattr(f.geod, "InverseLine")
+
+
+def test_ellipsoid_assigned_directly():
+    f = fast.geodesic()
+    f.ELLIPSOID = ref.ELLIPSOIDS["GRS-80"]
+    r = ref.geodesic(ellipsoid="GRS-80")
+    a, b = (35.36, 138.72), (40.64, -73.77)
+    assert same_km(f.measure(a, b), r.measure(a, b))
+
+
+def test_star_import_and_dir():
+    ns_ref, ns_fast = {}, {}
+    exec("from geopy.distance import *", ns_ref)
+    exec("from fastgeodesic.distance import *", ns_fast)
+    assert set(ns_ref) - {"__builtins__"} <= set(ns_fast)
+    assert ns_fast["geodesic"] is fast.geodesic
+    assert all(ns_fast[n] is ns_ref[n] for n in ns_ref if n not in ("__builtins__", "geodesic", "GeodesicDistance", "distance"))
+    assert {"great_circle", "lonlat", "ELLIPSOIDS"} <= set(dir(fast))
+    with pytest.raises(AttributeError, match="fastgeodesic.distance"):
+        fast.no_such_name
+
+
+def test_core_geodesic_pickle():
+    import pickle
+
+    from fastgeodesic import Geodesic
+
+    g = pickle.loads(pickle.dumps(Geodesic(6377397.155, 1 / 299.1528128)))
+    assert type(g) is Geodesic and (g.a, g.f) == (6377397.155, 1 / 299.1528128)
+    assert pickle.loads(pickle.dumps(Geodesic.WGS84)).Inverse(35, 139, 36, 140) == Geodesic.WGS84.Inverse(35, 139, 36, 140)

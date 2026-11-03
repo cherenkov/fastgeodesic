@@ -83,6 +83,11 @@ impl Geodesic {
         Geodesic { g: G::new(a, f), a, f }
     }
 
+    /// Lets pickle and copy rebuild the object from (a, f), as geographiclib allows
+    fn __getnewargs__(&self) -> (f64, f64) {
+        (self.a, self.f)
+    }
+
     #[pyo3(name = "Inverse", signature = (lat1, lon1, lat2, lon2, outmask = caps::STANDARD))]
     fn inverse<'py>(
         &self,

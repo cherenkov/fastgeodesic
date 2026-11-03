@@ -11,6 +11,11 @@ license = { text = "MIT" }
 readme = "README.md"
 keywords = ["geodesic", "geographiclib", "geopy", "distance", "wgs84", "gps", "rust"]
 
+[project.optional-dependencies]
+# fastgeodesic.distance subclasses geopy.distance.geodesic; tested with geopy 2.0 to 2.5
+geopy = ["geopy>=2.0,<3"]
+test = ["pytest", "geographiclib", "geopy>=2.0,<3", "numpy"]
+
 [tool.maturin]
 python-source = "python"
 module-name = "fastgeodesic._core"

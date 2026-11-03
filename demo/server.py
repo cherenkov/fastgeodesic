@@ -75,6 +75,11 @@ def bench(q):
 
     t_geopy, g_ref = timed(lambda: [distance.geodesic(c[:2], c[2:]).meters for c in pts])
     t_geopy_fast, g_fast = timed(lambda: [fast_distance.geodesic(c[:2], c[2:]).meters for c in pts])
+    fastgeodesic.patch()
+    try:
+        t_geopy_patch, g_patch = timed(lambda: [distance.geodesic(c[:2], c[2:]).meters for c in pts])
+    finally:
+        fastgeodesic.unpatch()
 
     def cmp(a, b):
         return {"max_diff_m": max(abs(x - y) for x, y in zip(a, b)), "identical": sum(x == y for x, y in zip(a, b))}
@@ -85,6 +90,7 @@ def bench(q):
             {"label": "geographiclib Geodesic.Inverse(1組ずつ)", "ref_ms": t_ref, "fast_ms": t_fast, **cmp(r_ref, r_fast)},
             {"label": "geographiclib → inverse_many(まとめて)", "ref_ms": t_ref, "fast_ms": t_many, **cmp(r_ref, r_many)},
             {"label": "geopy distance.geodesic → fastgeodesic.distance", "ref_ms": t_geopy, "fast_ms": t_geopy_fast, **cmp(g_ref, g_fast)},
+            {"label": "geopy distance.geodesic(patch() のみ)", "ref_ms": t_geopy, "fast_ms": t_geopy_patch, **cmp(g_ref, g_patch)},
         ],
     }
 
